@@ -14,4 +14,4 @@ venv/
 .DS_Store
 
 # HA development
-.custom_components/
+# Note: custom_components/ is intentionally NOT ignored - it's our source code

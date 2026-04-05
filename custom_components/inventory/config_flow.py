@@ -9,36 +9,29 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import config_validation as cv
 from homeassistant.util import slugify
 
-from .const import CONF_ICON, CONF_LOCATION_ID, CONF_LOCATION_NAME, DOMAIN
+from .const import DOMAIN
 from .storage import InventoryStorage
 
 DEFAULT_ICON = "mdi:package-variant"
 
 
-def _get_storage(hass: HomeAssistant) -> InventoryStorage:
+def _get_storage(hass: HomeAssistant) -> InventoryStorage | None:
     """Get the storage instance."""
+    if DOMAIN not in hass.data:
+        return None
+    return hass.data[DOMAIN].get("storage")
+
+
+async def _ensure_storage(hass: HomeAssistant) -> InventoryStorage:
+    """Ensure storage is initialized and return it."""
+    if DOMAIN not in hass.data:
+        from .storage import InventoryStorage
+        storage = InventoryStorage(hass)
+        await storage.async_load()
+        hass.data[DOMAIN] = {"storage": storage}
     return hass.data[DOMAIN]["storage"]
-
-
-async def _async_get_or_create_location(
-    hass: HomeAssistant, name: str, icon: str = DEFAULT_ICON
-) -> str:
-    """Create a location and return its ID."""
-    storage = _get_storage(hass)
-    location_id = slugify(name)
-
-    # Ensure unique ID
-    base_id = location_id
-    counter = 1
-    while storage.get_location(location_id) is not None:
-        location_id = f"{base_id}_{counter}"
-        counter += 1
-
-    await storage.async_add_location(location_id, name, icon)
-    return location_id
 
 
 class InventoryConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -54,7 +47,6 @@ class InventoryConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             return self.async_abort(reason="single_instance_allowed")
 
         if user_input is not None:
-            # Create the config entry
             return self.async_create_entry(title="Inventory", data={})
 
         return self.async_show_form(step_id="user")
@@ -78,12 +70,18 @@ class InventoryOptionsFlow(config_entries.OptionsFlow):
 
     def _get_storage(self) -> InventoryStorage:
         """Get storage instance."""
-        return _get_storage(self.hass)
+        storage = _get_storage(self.hass)
+        if storage is None:
+            raise RuntimeError("Storage not initialized")
+        return storage
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle options flow - show menu."""
+        # Ensure storage is initialized
+        await _ensure_storage(self.hass)
+
         if user_input is not None:
             action = user_input.get("action")
             if action == "add":
@@ -128,7 +126,13 @@ class InventoryOptionsFlow(config_entries.OptionsFlow):
                         break
 
                 if not errors:
-                    await _async_get_or_create_location(self.hass, name, icon)
+                    location_id = slugify(name)
+                    base_id = location_id
+                    counter = 1
+                    while storage.get_location(location_id) is not None:
+                        location_id = f"{base_id}_{counter}"
+                        counter += 1
+                    await storage.async_add_location(location_id, name, icon)
                     return await self.async_step_init()
 
         schema = vol.Schema({

@@ -21,9 +21,10 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Inventory integration."""
     # Initialize storage
-    storage = InventoryStorage(hass)
-    await storage.async_load()
-    hass.data[DOMAIN] = {"storage": storage}
+    if DOMAIN not in hass.data:
+        storage = InventoryStorage(hass)
+        await storage.async_load()
+        hass.data[DOMAIN] = {"storage": storage}
 
     # Register services
     await async_setup_services(hass)
