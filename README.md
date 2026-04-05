@@ -1,93 +1,171 @@
-# Pantry HA
+# Inventory - Home Assistant Custom Integration
 
+A custom Home Assistant integration for tracking food inventory across configurable storage locations (freezer, cupboard, fridge, etc.).
 
+## Features
 
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin https://gitlab.com/Steuls/pantry-ha.git
-git branch -M main
-git push -uf origin main
-```
-
-## Integrate with your tools
-
-* [Set up project integrations](https://gitlab.com/Steuls/pantry-ha/-/settings/integrations)
-
-## Collaborate with your team
-
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
-
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
-
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
-
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+- **Configurable Locations** - Add/remove storage locations via UI
+- **Item Tracking** - Track name, quantity, unit, expiry date, category, and notes
+- **Expiry Monitoring** - Automatic expired/expiring-soon counts per location
+- **Persistence** - Data survives Home Assistant restarts
+- **Automation Ready** - Events fired on all inventory changes
+- **Dashboard Compatible** - Works with existing HA cards
 
 ## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+### HACS (Recommended)
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+1. Add this repository as a custom repository in HACS
+2. Search for "Inventory" and install
+3. Restart Home Assistant
+
+### Manual
+
+1. Copy the `custom_components/inventory/` folder to your Home Assistant `custom_components/` directory
+2. Restart Home Assistant
+
+## Setup
+
+1. Go to **Settings** → **Devices & Services**
+2. Click **Add Integration** (bottom right)
+3. Search for "Inventory" and select it
+4. The integration will be set up automatically
+
+## Managing Locations
+
+After setup, click the **Configure** (gear) button on the integration card:
+
+- **Add Location** - Create a new storage location (e.g., "Freezer", "Cupboard")
+- **Manage Location** - Rename or delete existing locations
+
+## Services
+
+### inventory.add_item
+
+Add an item to a location. If an item with the same name exists, it will update the quantity.
+
+```yaml
+service: inventory.add_item
+data:
+  location: freezer
+  name: Milk
+  quantity: 2
+  unit: litres
+  expiry: "2026-04-15"
+  category: dairy
+  notes: Semi-skimmed
+```
+
+| Parameter | Required | Type | Description |
+|-----------|----------|------|-------------|
+| location | Yes | string | Location ID |
+| name | Yes | string | Item name |
+| quantity | No | integer | Quantity (default: 1) |
+| unit | No | string | Unit of measure |
+| expiry | No | string | Expiry date (YYYY-MM-DD) |
+| category | No | string | Category for filtering |
+| notes | No | string | Additional notes |
+
+### inventory.remove_item
+
+Remove an item or reduce its quantity.
+
+```yaml
+service: inventory.remove_item
+data:
+  location: freezer
+  name: Milk
+  quantity: 1  # Optional - omit to remove entirely
+```
+
+### inventory.update_item
+
+Update specific fields of an existing item.
+
+```yaml
+service: inventory.update_item
+data:
+  location: freezer
+  name: Milk
+  expiry: "2026-04-20"
+  notes: Changed to whole milk
+```
+
+### inventory.clear_expired
+
+Remove all expired items from one or all locations.
+
+```yaml
+# Clear from specific location
+service: inventory.clear_expired
+data:
+  location: freezer
+
+# Clear from all locations
+service: inventory.clear_expired
+```
+
+Returns the count of removed items.
+
+### inventory.clear_all
+
+Remove all items from a specific location.
+
+```yaml
+service: inventory.clear_all
+data:
+  location: freezer
+```
+
+## Entities
+
+Each location creates a sensor entity:
+
+- **Entity ID**: `sensor.inventory_{location_id}`
+- **State**: Number of items in the location
+- **Attributes**:
+  - `location_id` - Location identifier
+  - `location_name` - Display name
+  - `items` - Full list of items
+  - `item_count` - Total items
+  - `expired_count` - Items past expiry
+  - `expiring_soon_count` - Items expiring within 7 days
+  - `categories` - Unique categories in use
+
+## Events
+
+Events are fired for automation triggers:
+
+| Event | Data |
+|-------|------|
+| `inventory_item_added` | `location_id`, `location_name`, `item` |
+| `inventory_item_removed` | `location_id`, `location_name`, `item_name`, `item`, `reason` |
+| `inventory_item_updated` | `location_id`, `location_name`, `item` |
+| `inventory_expired_cleared` | `location_id`, `items`, `count` |
+| `inventory_all_cleared` | `location_id`, `location_name`, `count` |
+
+### Example Automation
+
+```yaml
+automation:
+  - alias: "Notify on expired items cleared"
+    trigger:
+      - event: inventory_expired_cleared
+        event_type: custom
+        platform: event
+    action:
+      - service: notify.mobile_app
+        data:
+          message: "Cleared {{ trigger.event.data.count }} expired items"
+```
 
 ## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
-
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+- [ ] Custom Lovelace card for rich inventory UI
+- [ ] Native Assist/voice intents
+- [ ] Barcode scanning support
+- [ ] Shopping list integration
 
 ## License
-For open source projects, say how it is licensed.
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+MIT

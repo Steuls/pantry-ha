@@ -1,0 +1,66 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Inventory",
+        "description": "Set up inventory tracking for your food storage locations."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only one Inventory integration is allowed."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Manage Locations",
+        "description": "You have {location_count} location(s) configured.",
+        "data": {
+          "action": "Action"
+        }
+      },
+      "add_location": {
+        "title": "Add Location",
+        "description": "Add a new storage location.",
+        "data": {
+          "name": "Name",
+          "icon": "Icon"
+        }
+      },
+      "select_location": {
+        "title": "Select Location",
+        "description": "Select a location to manage.",
+        "data": {
+          "location": "Location"
+        }
+      },
+      "manage_location": {
+        "title": "Manage Location",
+        "description": "Managing: {location_name}",
+        "data": {
+          "action": "Action"
+        }
+      },
+      "rename_location": {
+        "title": "Rename Location",
+        "description": "Update the name and icon for this location.",
+        "data": {
+          "name": "Name",
+          "icon": "Icon"
+        }
+      },
+      "delete_location": {
+        "title": "Delete Location",
+        "description": "Are you sure you want to delete '{location_name}'? This will remove {item_count} item(s).",
+        "data": {
+          "confirm": "Yes, delete this location"
+        }
+      }
+    },
+    "error": {
+      "name_required": "Name is required.",
+      "name_exists": "A location with this name already exists."
+    }
+  },
+  "title": "Inventory"
+}
