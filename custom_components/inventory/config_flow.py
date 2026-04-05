@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import voluptuous as vol
@@ -14,6 +15,7 @@ from homeassistant.util import slugify
 from .const import DOMAIN
 from .storage import InventoryStorage
 
+_LOGGER = logging.getLogger(__name__)
 DEFAULT_ICON = "mdi:package-variant"
 
 
@@ -26,11 +28,16 @@ def _get_storage(hass: HomeAssistant) -> InventoryStorage | None:
 
 async def _ensure_storage(hass: HomeAssistant) -> InventoryStorage:
     """Ensure storage is initialized and return it."""
+    _LOGGER.debug("_ensure_storage called, DOMAIN=%s in hass.data: %s", DOMAIN, DOMAIN in hass.data)
     if DOMAIN not in hass.data:
+        _LOGGER.debug("Creating new storage instance")
         from .storage import InventoryStorage
         storage = InventoryStorage(hass)
         await storage.async_load()
         hass.data[DOMAIN] = {"storage": storage}
+        _LOGGER.debug("Storage created and loaded")
+    else:
+        _LOGGER.debug("Storage already exists")
     return hass.data[DOMAIN]["storage"]
 
 
@@ -65,22 +72,32 @@ class InventoryOptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
+        _LOGGER.debug("InventoryOptionsFlow.__init__ called")
         self.config_entry = config_entry
         self._selected_location: str | None = None
 
     def _get_storage(self) -> InventoryStorage:
         """Get storage instance."""
+        _LOGGER.debug("_get_storage called, hass.data keys: %s", list(self.hass.data.keys()))
         storage = _get_storage(self.hass)
         if storage is None:
+            _LOGGER.error("Storage not initialized!")
             raise RuntimeError("Storage not initialized")
+        _LOGGER.debug("Storage retrieved successfully")
         return storage
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Handle options flow - show menu."""
-        # Ensure storage is initialized
-        await _ensure_storage(self.hass)
+        _LOGGER.debug("async_step_init called with user_input=%s", user_input)
+        try:
+            # Ensure storage is initialized
+            await _ensure_storage(self.hass)
+            _LOGGER.debug("Storage ensured successfully")
+        except Exception as e:
+            _LOGGER.exception("Failed to ensure storage: %s", e)
+            raise
 
         if user_input is not None:
             action = user_input.get("action")

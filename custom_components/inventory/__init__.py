@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.config_entries import ConfigEntry
@@ -15,20 +16,29 @@ from .storage import InventoryStorage
 if TYPE_CHECKING:
     from homeassistant.helpers.typing import ConfigType
 
+_LOGGER = logging.getLogger(__name__)
+
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Inventory integration."""
+    _LOGGER.debug("async_setup called")
     # Initialize storage
     if DOMAIN not in hass.data:
+        _LOGGER.debug("Creating storage instance")
         storage = InventoryStorage(hass)
         await storage.async_load()
         hass.data[DOMAIN] = {"storage": storage}
+        _LOGGER.debug("Storage initialized")
+    else:
+        _LOGGER.debug("Storage already exists")
 
     # Register services
+    _LOGGER.debug("Setting up services")
     await async_setup_services(hass)
 
+    _LOGGER.debug("async_setup complete")
     return True
 
 

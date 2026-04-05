@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime
 from typing import Any
 
@@ -9,6 +10,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
 
 STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_data"
@@ -19,15 +22,19 @@ class InventoryStorage:
 
     def __init__(self, hass: HomeAssistant) -> None:
         """Initialize storage."""
+        _LOGGER.debug("InventoryStorage.__init__ called")
         self._hass = hass
         self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
         self._data: dict[str, Any] | None = None
 
     async def async_load(self) -> None:
         """Load data from storage."""
+        _LOGGER.debug("InventoryStorage.async_load called")
         self._data = await self._store.async_load()
         if self._data is None:
+            _LOGGER.debug("No existing data, creating empty structure")
             self._data = {"locations": {}}
+        _LOGGER.debug("Data loaded: %s locations", len(self._data.get("locations", {})))
 
     async def async_save(self) -> None:
         """Save data to storage."""
