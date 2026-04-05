@@ -1,0 +1,145 @@
+add_item:
+  name: Add Item
+  description: Add an item to a storage location.
+  fields:
+    location:
+      name: Location
+      description: The storage location ID.
+      required: true
+      selector:
+        text:
+    name:
+      name: Name
+      description: Name of the item.
+      required: true
+      selector:
+        text:
+    quantity:
+      name: Quantity
+      description: Quantity to add.
+      required: false
+      default: 1
+      selector:
+        number:
+          min: 1
+          mode: box
+    unit:
+      name: Unit
+      description: Unit of measurement.
+      required: false
+      selector:
+        text:
+    expiry:
+      name: Expiry Date
+      description: Expiry date in YYYY-MM-DD format.
+      required: false
+      selector:
+        text:
+    category:
+      name: Category
+      description: Category for filtering.
+      required: false
+      selector:
+        text:
+    notes:
+      name: Notes
+      description: Additional notes.
+      required: false
+      selector:
+        text:
+
+remove_item:
+  name: Remove Item
+  description: Remove an item or reduce its quantity from a storage location.
+  fields:
+    location:
+      name: Location
+      description: The storage location ID.
+      required: true
+      selector:
+        text:
+    name:
+      name: Name
+      description: Name of the item to remove.
+      required: true
+      selector:
+        text:
+    quantity:
+      name: Quantity
+      description: Quantity to remove. If omitted or >= current quantity, removes entirely.
+      required: false
+      selector:
+        number:
+          min: 1
+          mode: box
+
+update_item:
+  name: Update Item
+  description: Update an existing item's fields.
+  fields:
+    location:
+      name: Location
+      description: The storage location ID.
+      required: true
+      selector:
+        text:
+    name:
+      name: Name
+      description: Name of the item to update.
+      required: true
+      selector:
+        text:
+    quantity:
+      name: Quantity
+      description: New quantity.
+      required: false
+      selector:
+        number:
+          min: 1
+          mode: box
+    unit:
+      name: Unit
+      description: New unit of measurement.
+      required: false
+      selector:
+        text:
+    expiry:
+      name: Expiry Date
+      description: New expiry date in YYYY-MM-DD format.
+      required: false
+      selector:
+        text:
+    category:
+      name: Category
+      description: New category.
+      required: false
+      selector:
+        text:
+    notes:
+      name: Notes
+      description: New notes.
+      required: false
+      selector:
+        text:
+
+clear_expired:
+  name: Clear Expired
+  description: Remove all expired items from one or all locations.
+  fields:
+    location:
+      name: Location
+      description: The storage location ID. If omitted, clears from all locations.
+      required: false
+      selector:
+        text:
+
+clear_all:
+  name: Clear All
+  description: Remove all items from a specific location.
+  fields:
+    location:
+      name: Location
+      description: The storage location ID.
+      required: true
+      selector:
+        text:
