@@ -15,3 +15,4 @@ venv/
 
 # HA development
 # Note: custom_components/ is intentionally NOT ignored - it's our source code
+.codex

@@ -10,6 +10,7 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
+from .panel import async_setup_panel
 from .services import async_setup_services, async_unload_services
 from .storage import InventoryStorage
 
@@ -37,6 +38,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     # Register services
     _LOGGER.debug("Setting up services")
     await async_setup_services(hass)
+
+    # Register sidebar panel
+    _LOGGER.debug("Setting up panel")
+    await async_setup_panel(hass)
 
     _LOGGER.debug("async_setup complete")
     return True
