@@ -98,26 +98,15 @@ class InventoryOptionsFlow(config_entries.OptionsFlow):
             _LOGGER.exception("Failed to ensure storage: %s", e)
             raise
 
-        if user_input is not None:
-            action = user_input.get("action")
-            if action == "add":
-                return await self.async_step_add_location()
-            elif action == "manage":
-                return await self.async_step_select_location()
-
-        # Build options menu
         locations = self._get_storage().get_locations()
-        location_count = len(locations)
+        if not locations:
+            return await self.async_step_add_location()
 
-        options_schema = vol.Schema({
-            vol.Required("action"): vol.In(["add", "manage"] if location_count > 0 else ["add"])
-        })
-
-        return self.async_show_form(
+        return self.async_show_menu(
             step_id="init",
-            data_schema=options_schema,
+            menu_options=["add_location", "select_location"],
             description_placeholders={
-                "location_count": str(location_count)
+                "location_count": str(len(locations))
             },
         )
 
@@ -129,7 +118,6 @@ class InventoryOptionsFlow(config_entries.OptionsFlow):
 
         if user_input is not None:
             name = user_input.get("name", "").strip()
-            icon = user_input.get("icon", DEFAULT_ICON)
 
             if not name:
                 errors["name"] = "name_required"
@@ -148,13 +136,12 @@ class InventoryOptionsFlow(config_entries.OptionsFlow):
                     while storage.get_location(location_id) is not None:
                         location_id = f"{base_id}_{counter}"
                         counter += 1
-                    await storage.async_add_location(location_id, name, icon)
+                    await storage.async_add_location(location_id, name, DEFAULT_ICON)
                     await self.hass.config_entries.async_reload(self.config_entry.entry_id)
                     return self.async_create_entry(title="", data={})
 
         schema = vol.Schema({
             vol.Required("name"): str,
-            vol.Optional("icon", default=DEFAULT_ICON): str,
         })
 
         return self.async_show_form(
@@ -167,12 +154,16 @@ class InventoryOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Select a location to manage."""
+        storage = self._get_storage()
+        locations = storage.get_locations()
+
+        if len(locations) == 1:
+            self._selected_location = next(iter(locations))
+            return await self.async_step_manage_location()
+
         if user_input is not None:
             self._selected_location = user_input.get("location")
             return await self.async_step_manage_location()
-
-        storage = self._get_storage()
-        locations = storage.get_locations()
 
         location_options = {
             loc_id: loc_data.get("name", loc_id)
@@ -192,26 +183,13 @@ class InventoryOptionsFlow(config_entries.OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Manage selected location - rename, delete, or back."""
-        if user_input is not None:
-            action = user_input.get("action")
-            if action == "rename":
-                return await self.async_step_rename_location()
-            elif action == "delete":
-                return await self.async_step_delete_location()
-            elif action == "back":
-                return await self.async_step_init()
-
         storage = self._get_storage()
         location = storage.get_location(self._selected_location)
         location_name = location.get("name", self._selected_location) if location else self._selected_location
 
-        schema = vol.Schema({
-            vol.Required("action"): vol.In(["rename", "delete", "back"])
-        })
-
-        return self.async_show_form(
+        return self.async_show_menu(
             step_id="manage_location",
-            data_schema=schema,
+            menu_options=["rename_location", "delete_location", "init"],
             description_placeholders={
                 "location_name": location_name
             },
