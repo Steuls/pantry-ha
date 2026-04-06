@@ -67,13 +67,13 @@ class InventoryConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return InventoryOptionsFlow(config_entry)
 
 
-class InventoryOptionsFlow(config_entries.OptionsFlowWithReload):
+class InventoryOptionsFlow(config_entries.OptionsFlow):
     """Handle options flow for Inventory."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
         _LOGGER.debug("InventoryOptionsFlow.__init__ called")
-        super().__init__(config_entry)
+        self.config_entry = config_entry
         self._selected_location: str | None = None
 
     def _get_storage(self) -> InventoryStorage:
