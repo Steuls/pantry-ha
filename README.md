@@ -9,6 +9,7 @@ A custom Home Assistant integration for tracking food inventory across configura
 - **Expiry Monitoring** - Automatic expired/expiring-soon counts per location
 - **Persistence** - Data survives Home Assistant restarts
 - **Automation Ready** - Events fired on all inventory changes
+- **Native Sidebar UI** - Manage inventory directly in Home Assistant
 - **Dashboard Compatible** - Works with existing HA cards
 
 ## Installation
@@ -37,6 +38,18 @@ After setup, click the **Configure** (gear) button on the integration card:
 
 - **Add Location** - Create a new storage location (e.g., "Freezer", "Cupboard")
 - **Manage Location** - Rename or delete existing locations
+
+## Home Assistant UI
+
+After installing the integration, a new **Inventory** item appears in the Home Assistant sidebar.
+
+From this panel you can:
+- View all configured locations
+- See item counts, expired count, and expiring-soon count
+- Add new items with quantity/unit/expiry
+- Decrement or fully remove items
+
+Location creation/rename/delete still lives under **Settings → Devices & Services → Inventory → Configure**.
 
 ## Services
 

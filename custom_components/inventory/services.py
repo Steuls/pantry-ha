@@ -119,6 +119,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             "location_name": location.get("name", location_id) if location else location_id,
             "item": item,
         })
+        _fire_event(hass, "updated", {"location_id": location_id})
 
     async def remove_item(call: ServiceCall) -> None:
         """Remove an item from a location."""
@@ -151,6 +152,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             "item": result,
             "reason": reason,
         })
+        _fire_event(hass, "updated", {"location_id": location_id})
 
     async def update_item(call: ServiceCall) -> None:
         """Update an item in a location."""
@@ -188,6 +190,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             "location_name": location.get("name", location_id) if location else location_id,
             "item": item,
         })
+        _fire_event(hass, "updated", {"location_id": location_id})
 
     async def clear_expired(call: ServiceCall) -> ServiceResponse:
         """Clear expired items from one or all locations."""
@@ -208,6 +211,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
                 "items": removed_items,
                 "count": len(removed_items),
             })
+            _fire_event(hass, "updated", {"location_id": location_id})
 
         return {
             "removed_count": len(removed_items),
@@ -232,6 +236,7 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             "location_name": location.get("name", location_id) if location else location_id,
             "count": len(removed_items),
         })
+        _fire_event(hass, "updated", {"location_id": location_id})
 
         return {
             "removed_count": len(removed_items),
