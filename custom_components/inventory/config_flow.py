@@ -64,16 +64,15 @@ class InventoryConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         config_entry: config_entries.ConfigEntry,
     ) -> InventoryOptionsFlow:
         """Get the options flow for this handler."""
-        return InventoryOptionsFlow(config_entry)
+        return InventoryOptionsFlow()
 
 
-class InventoryOptionsFlow(config_entries.OptionsFlowWithReload):
+class InventoryOptionsFlow(config_entries.OptionsFlow):
     """Handle options flow for Inventory."""
 
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+    def __init__(self) -> None:
         """Initialize options flow."""
         _LOGGER.debug("InventoryOptionsFlow.__init__ called")
-        super().__init__(config_entry)
         self._selected_location: str | None = None
 
     def _get_storage(self) -> InventoryStorage:
@@ -150,6 +149,7 @@ class InventoryOptionsFlow(config_entries.OptionsFlowWithReload):
                         location_id = f"{base_id}_{counter}"
                         counter += 1
                     await storage.async_add_location(location_id, name, icon)
+                    await self.hass.config_entries.async_reload(self.config_entry.entry_id)
                     return self.async_create_entry(title="", data={})
 
         schema = vol.Schema({
@@ -246,6 +246,7 @@ class InventoryOptionsFlow(config_entries.OptionsFlowWithReload):
                         name=new_name,
                         icon=new_icon
                     )
+                    await self.hass.config_entries.async_reload(self.config_entry.entry_id)
                     return self.async_create_entry(title="", data={})
 
         current_name = location.get("name", "") if location else ""
@@ -271,6 +272,7 @@ class InventoryOptionsFlow(config_entries.OptionsFlowWithReload):
             if confirm:
                 storage = self._get_storage()
                 await storage.async_remove_location(self._selected_location)
+                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
                 return self.async_create_entry(title="", data={})
             return await self.async_step_init()
 
