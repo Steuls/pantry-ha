@@ -67,13 +67,13 @@ class InventoryConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return InventoryOptionsFlow(config_entry)
 
 
-class InventoryOptionsFlow(config_entries.OptionsFlow):
+class InventoryOptionsFlow(config_entries.OptionsFlowWithReload):
     """Handle options flow for Inventory."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
         _LOGGER.debug("InventoryOptionsFlow.__init__ called")
-        self.config_entry = config_entry
+        super().__init__(config_entry)
         self._selected_location: str | None = None
 
     def _get_storage(self) -> InventoryStorage:
@@ -246,7 +246,7 @@ class InventoryOptionsFlow(config_entries.OptionsFlow):
                         name=new_name,
                         icon=new_icon
                     )
-                    return await self.async_step_init()
+                    return self.async_create_entry(title="", data={})
 
         current_name = location.get("name", "") if location else ""
         current_icon = location.get("icon", DEFAULT_ICON) if location else DEFAULT_ICON
