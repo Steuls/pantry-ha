@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from textwrap import dedent
 
 import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
@@ -13,26 +14,67 @@ from .const import DOMAIN
 from .storage import InventoryStorage
 
 
-def _get_assist_sentence_paths(hass: HomeAssistant) -> tuple[Path, Path]:
-    """Return the packaged and installed Assist sentence paths."""
-    source_path = Path(__file__).resolve().parents[2] / "custom_sentences" / "en" / "inventory.yaml"
-    target_path = Path(hass.config.path("custom_sentences", "en", "inventory.yaml"))
-    return source_path, target_path
+ASSIST_SENTENCES_EN = dedent(
+    """\
+    language: "en"
+    intents:
+      InventoryAddItem:
+        data:
+          - sentences:
+              - "(add | put) {item} (in | into | to) [the] {location}"
+              - "(add | put) {item} (in | into | to) [my] {location}"
+            lists:
+              item:
+                wildcard: true
+              location:
+                wildcard: true
+      InventoryRemoveItem:
+        data:
+          - sentences:
+              - "(remove | take) {item} from [the] {location}"
+              - "(remove | take) {item} from [my] {location}"
+            lists:
+              item:
+                wildcard: true
+              location:
+                wildcard: true
+      InventoryGetItems:
+        data:
+          - sentences:
+              - "<what_is> in [the] {location}"
+              - "<what_is> in [my] {location}"
+              - "list [the] items in [the] {location}"
+              - "list [the] items in [my] {location}"
+            lists:
+              location:
+                wildcard: true
+      InventoryGetExpiringSoon:
+        data:
+          - sentences:
+              - "<what_is> expiring soon"
+              - "<what_is> expiring soon in [the] {location}"
+              - "<what_is> expiring soon in [my] {location}"
+            lists:
+              location:
+                wildcard: true
+    expansion_rules:
+      what_is: "(what's | whats | what is)"
+    """
+)
+
+
+def _get_assist_sentence_target_path(hass: HomeAssistant) -> Path:
+    """Return the installed Assist sentence path."""
+    return Path(hass.config.path("custom_sentences", "en", "inventory.yaml"))
 
 
 async def async_install_assist_sentences(hass: HomeAssistant) -> str:
     """Install the packaged Assist sentence file into the HA config dir."""
-    source_path, target_path = _get_assist_sentence_paths(hass)
-
-    if not source_path.exists():
-        raise ServiceValidationError(
-            f"Assist sentence source file not found at {source_path}",
-            translation_domain=DOMAIN,
-        )
+    target_path = _get_assist_sentence_target_path(hass)
 
     def _write_file() -> None:
         target_path.parent.mkdir(parents=True, exist_ok=True)
-        target_path.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8")
+        target_path.write_text(ASSIST_SENTENCES_EN, encoding="utf-8")
 
     await hass.async_add_executor_job(_write_file)
     return str(target_path)

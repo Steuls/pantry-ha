@@ -139,7 +139,7 @@ The integration now includes intent handlers for Assist so it can understand:
 - `What's in my freezer?`
 - `What's expiring soon?`
 
-On startup, the integration automatically copies the packaged sentence file from [`custom_sentences/en/inventory.yaml`](custom_sentences/en/inventory.yaml) into:
+On startup, the integration automatically writes its Assist sentence file into:
 
 ```text
 /config/custom_sentences/en/inventory.yaml
