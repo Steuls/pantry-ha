@@ -143,3 +143,7 @@ clear_all:
       required: true
       selector:
         text:
+
+install_assist_sentences:
+  name: Install Assist Sentences
+  description: Copy the packaged Assist sentence file into Home Assistant's custom_sentences directory.

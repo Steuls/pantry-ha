@@ -8,10 +8,16 @@ from typing import TYPE_CHECKING
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 
 from .const import DOMAIN
+from .intent import async_setup_intents
 from .panel import async_setup_panel
-from .services import async_setup_services, async_unload_services
+from .services import (
+    async_install_assist_sentences,
+    async_setup_services,
+    async_unload_services,
+)
 from .storage import InventoryStorage
 
 if TYPE_CHECKING:
@@ -38,6 +44,16 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     # Register services
     _LOGGER.debug("Setting up services")
     await async_setup_services(hass)
+
+    # Keep Assist sentence pack in sync with the installed integration version
+    try:
+        await async_install_assist_sentences(hass)
+    except HomeAssistantError:
+        _LOGGER.exception("Failed to install Assist sentences")
+
+    # Register Assist intent handlers
+    _LOGGER.debug("Setting up intents")
+    async_setup_intents(hass)
 
     # Register sidebar panel
     _LOGGER.debug("Setting up panel")

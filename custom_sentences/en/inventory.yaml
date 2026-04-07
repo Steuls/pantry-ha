@@ -1,0 +1,43 @@
+language: "en"
+intents:
+  InventoryAddItem:
+    data:
+      - sentences:
+          - "(add | put) {item} (in | into | to) [the] {location}"
+          - "(add | put) {item} (in | into | to) [my] {location}"
+        lists:
+          item:
+            wildcard: true
+          location:
+            wildcard: true
+  InventoryRemoveItem:
+    data:
+      - sentences:
+          - "(remove | take) {item} from [the] {location}"
+          - "(remove | take) {item} from [my] {location}"
+        lists:
+          item:
+            wildcard: true
+          location:
+            wildcard: true
+  InventoryGetItems:
+    data:
+      - sentences:
+          - "<what_is> in [the] {location}"
+          - "<what_is> in [my] {location}"
+          - "list [the] items in [the] {location}"
+          - "list [the] items in [my] {location}"
+        lists:
+          location:
+            wildcard: true
+  InventoryGetExpiringSoon:
+    data:
+      - sentences:
+          - "<what_is> expiring soon"
+          - "<what_is> expiring soon in [the] {location}"
+          - "<what_is> expiring soon in [my] {location}"
+        lists:
+          location:
+            wildcard: true
+expansion_rules:
+  what_is: "(what's | whats | what is)"

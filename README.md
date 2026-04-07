@@ -130,6 +130,29 @@ data:
   location: freezer
 ```
 
+## Assist
+
+The integration now includes intent handlers for Assist so it can understand:
+
+- `Add chicken to the freezer`
+- `Remove yogurt from the fridge`
+- `What's in my freezer?`
+- `What's expiring soon?`
+
+On startup, the integration automatically copies the packaged sentence file from [`custom_sentences/en/inventory.yaml`](custom_sentences/en/inventory.yaml) into:
+
+```text
+/config/custom_sentences/en/inventory.yaml
+```
+
+After installing or upgrading through HACS, restart Home Assistant so Assist reloads the custom sentences. The `inventory.install_assist_sentences` service still exists as a manual fallback if you ever need to force a refresh.
+
+Notes:
+- Location matching is done against either the location ID or the location name.
+- `add` and `remove` voice commands currently use the default quantity of `1`.
+- `what's in ...` reads back up to 5 item names for the matched location.
+- `what's expiring soon` works globally or for a specific location.
+
 ## Entities
 
 Each location creates a sensor entity:
@@ -175,7 +198,7 @@ automation:
 ## Roadmap
 
 - [ ] Custom Lovelace card for rich inventory UI
-- [ ] Native Assist/voice intents
+- [x] Native Assist/voice intents
 - [ ] Barcode scanning support
 - [ ] Shopping list integration
 

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import ServiceValidationError
@@ -9,6 +11,31 @@ from homeassistant.helpers import config_validation as cv
 
 from .const import DOMAIN
 from .storage import InventoryStorage
+
+
+def _get_assist_sentence_paths(hass: HomeAssistant) -> tuple[Path, Path]:
+    """Return the packaged and installed Assist sentence paths."""
+    source_path = Path(__file__).resolve().parents[2] / "custom_sentences" / "en" / "inventory.yaml"
+    target_path = Path(hass.config.path("custom_sentences", "en", "inventory.yaml"))
+    return source_path, target_path
+
+
+async def async_install_assist_sentences(hass: HomeAssistant) -> str:
+    """Install the packaged Assist sentence file into the HA config dir."""
+    source_path, target_path = _get_assist_sentence_paths(hass)
+
+    if not source_path.exists():
+        raise ServiceValidationError(
+            f"Assist sentence source file not found at {source_path}",
+            translation_domain=DOMAIN,
+        )
+
+    def _write_file() -> None:
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8")
+
+    await hass.async_add_executor_job(_write_file)
+    return str(target_path)
 
 
 def _get_storage(hass: HomeAssistant) -> InventoryStorage:
@@ -55,6 +82,8 @@ CLEAR_EXPIRED_SCHEMA = vol.Schema({
 CLEAR_ALL_SCHEMA = vol.Schema({
     vol.Required("location"): str,
 })
+
+INSTALL_ASSIST_SENTENCES_SCHEMA = vol.Schema({})
 
 
 def _validate_location(hass: HomeAssistant, location_id: str) -> dict:
@@ -242,6 +271,13 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             "removed_count": len(removed_items),
         }
 
+    async def install_assist_sentences(call: ServiceCall) -> ServiceResponse:
+        """Install the packaged Assist sentence file into the HA config dir."""
+        return {
+            "installed": True,
+            "path": await async_install_assist_sentences(hass),
+        }
+
     hass.services.async_register(
         DOMAIN, "add_item", add_item, schema=ADD_ITEM_SCHEMA
     )
@@ -261,6 +297,11 @@ async def async_setup_services(hass: HomeAssistant) -> None:
         schema=CLEAR_ALL_SCHEMA,
         supports_response=SupportsResponse.ONLY,
     )
+    hass.services.async_register(
+        DOMAIN, "install_assist_sentences", install_assist_sentences,
+        schema=INSTALL_ASSIST_SENTENCES_SCHEMA,
+        supports_response=SupportsResponse.ONLY,
+    )
 
 
 async def async_unload_services(hass: HomeAssistant) -> None:
@@ -270,3 +311,4 @@ async def async_unload_services(hass: HomeAssistant) -> None:
     hass.services.async_remove(DOMAIN, "update_item")
     hass.services.async_remove(DOMAIN, "clear_expired")
     hass.services.async_remove(DOMAIN, "clear_all")
+    hass.services.async_remove(DOMAIN, "install_assist_sentences")

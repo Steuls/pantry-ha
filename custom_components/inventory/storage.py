@@ -351,6 +351,30 @@ class InventoryStorage:
         return count
 
     @callback
+    def get_expiring_soon_items(
+        self, location_id: str, days: int = 7
+    ) -> list[dict[str, Any]]:
+        """Get items expiring within N days."""
+        today = date.today()
+        from datetime import timedelta
+
+        threshold = today + timedelta(days=days)
+        matches = []
+        for item in self.get_items(location_id):
+            expiry_str = item.get("expiry")
+            if not expiry_str:
+                continue
+            try:
+                expiry_date = date.fromisoformat(expiry_str)
+            except ValueError:
+                continue
+
+            if today <= expiry_date <= threshold:
+                matches.append(item)
+
+        return matches
+
+    @callback
     def get_categories(self, location_id: str) -> list[str]:
         """Get unique categories in a location."""
         categories = set()
