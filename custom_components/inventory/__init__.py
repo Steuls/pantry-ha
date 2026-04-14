@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -17,6 +18,9 @@ from .const import (
     CONF_ENABLE_CACHE,
     CONF_POLL_SECONDS,
     CONF_REQUEST_TIMEOUT,
+    DEFAULT_ENABLE_CACHE,
+    DEFAULT_POLL_SECONDS,
+    DEFAULT_REQUEST_TIMEOUT,
     DATA_API,
     DATA_COORDINATOR,
     DATA_ENTRY_ID,
@@ -33,6 +37,8 @@ from .storage import InventoryStorage
 
 if TYPE_CHECKING:
     from homeassistant.helpers.typing import ConfigType
+
+_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
@@ -64,6 +70,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Inventory from a config entry."""
     domain_data = get_domain_data(hass)
     storage = get_storage(hass)
+
+    if not entry.data.get(CONF_BASE_URL) or not entry.data.get(CONF_API_KEY):
+        raise ConfigEntryNotReady(
+            "Inventory requires reconfiguration with pantry-server URL and API key."
+        )
+
     session = async_get_clientsession(hass)
     api = PantryApiClient(
         session=session,
@@ -105,6 +117,23 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     domain_data.pop(DATA_API, None)
     domain_data.pop(DATA_COORDINATOR, None)
     domain_data.pop(DATA_ENTRY_ID, None)
+    return True
+
+
+async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Migrate legacy config entries."""
+    if entry.version == 1:
+        data = {
+            **entry.data,
+            CONF_BASE_URL: entry.data.get(CONF_BASE_URL, ""),
+            CONF_API_KEY: entry.data.get(CONF_API_KEY, ""),
+            CONF_POLL_SECONDS: entry.data.get(CONF_POLL_SECONDS, DEFAULT_POLL_SECONDS),
+            CONF_REQUEST_TIMEOUT: entry.data.get(CONF_REQUEST_TIMEOUT, DEFAULT_REQUEST_TIMEOUT),
+            CONF_ENABLE_CACHE: entry.data.get(CONF_ENABLE_CACHE, DEFAULT_ENABLE_CACHE),
+        }
+        hass.config_entries.async_update_entry(entry, data=data, version=2)
+        _LOGGER.info("Migrated Inventory config entry %s to version 2", entry.entry_id)
+
     return True
 
 

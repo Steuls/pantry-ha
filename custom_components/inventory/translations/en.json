@@ -11,6 +11,17 @@
           "request_timeout": "Request timeout (seconds)",
           "enable_cache": "Use cached state during outages"
         }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Inventory",
+        "description": "Update the pantry-server connection for this Inventory entry.",
+        "data": {
+          "base_url": "Server URL",
+          "api_key": "API key",
+          "poll_seconds": "Poll interval (seconds)",
+          "request_timeout": "Request timeout (seconds)",
+          "enable_cache": "Use cached state during outages"
+        }
       }
     },
     "abort": {

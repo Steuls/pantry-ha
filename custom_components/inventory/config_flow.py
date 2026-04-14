@@ -92,6 +92,16 @@ async def _validate_server(hass, user_input: dict[str, Any]) -> None:
     await client.get_state()
 
 
+def _normalize_user_input(user_input: dict[str, Any]) -> dict[str, Any]:
+    """Normalize config flow input."""
+    return {
+        **user_input,
+        CONF_BASE_URL: str(user_input[CONF_BASE_URL]).rstrip("/"),
+        CONF_POLL_SECONDS: int(user_input[CONF_POLL_SECONDS]),
+        CONF_REQUEST_TIMEOUT: int(user_input[CONF_REQUEST_TIMEOUT]),
+    }
+
+
 class InventoryConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Inventory."""
 
@@ -104,12 +114,7 @@ class InventoryConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         errors: dict[str, str] = {}
         if user_input is not None:
-            normalized_input = {
-                **user_input,
-                CONF_BASE_URL: str(user_input[CONF_BASE_URL]).rstrip("/"),
-                CONF_POLL_SECONDS: int(user_input[CONF_POLL_SECONDS]),
-                CONF_REQUEST_TIMEOUT: int(user_input[CONF_REQUEST_TIMEOUT]),
-            }
+            normalized_input = _normalize_user_input(user_input)
             try:
                 await _validate_server(self.hass, normalized_input)
             except PantryAuthError:
@@ -126,6 +131,41 @@ class InventoryConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user",
             data_schema=_config_schema(user_input),
+            errors=errors,
+        )
+
+    async def async_step_reconfigure(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle reconfiguration for an existing entry."""
+        errors: dict[str, str] = {}
+        entry = self._get_reconfigure_entry()
+
+        if user_input is not None:
+            normalized_input = _normalize_user_input(user_input)
+            try:
+                await _validate_server(self.hass, normalized_input)
+            except PantryAuthError:
+                errors["base"] = "auth"
+            except PantryTimeoutError:
+                errors["base"] = "timeout"
+            except PantryValidationError:
+                errors["base"] = "invalid_response"
+            except PantryUnavailableError:
+                errors["base"] = "cannot_connect"
+            else:
+                return self.async_update_reload_and_abort(
+                    entry,
+                    data_updates=normalized_input,
+                )
+
+        defaults = dict(entry.data)
+        if CONF_API_KEY in defaults and defaults[CONF_API_KEY]:
+            defaults[CONF_API_KEY] = ""
+
+        return self.async_show_form(
+            step_id="reconfigure",
+            data_schema=_config_schema(defaults),
             errors=errors,
         )
 
