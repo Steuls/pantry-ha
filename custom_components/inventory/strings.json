@@ -40,12 +40,25 @@
         "title": "Locations",
         "description": "Add a new location or manage one of your existing locations.",
         "menu_options": {
+          "connection": "Connection settings",
           "add_location": "Add location",
           "select_location": "Manage existing location"
         },
         "menu_option_descriptions": {
+          "connection": "Update the pantry-server URL, API key, or polling settings.",
           "add_location": "Create a new pantry location in pantry-server.",
           "select_location": "Rename a location, change its local icon, or delete it."
+        }
+      },
+      "connection": {
+        "title": "Connection Settings",
+        "description": "Update the pantry-server connection for this Inventory entry.",
+        "data": {
+          "base_url": "Server URL",
+          "api_key": "API key",
+          "poll_seconds": "Poll interval (seconds)",
+          "request_timeout": "Request timeout (seconds)",
+          "enable_cache": "Use cached state during outages"
         }
       },
       "add_location": {

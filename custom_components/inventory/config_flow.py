@@ -183,6 +183,11 @@ class InventoryOptionsFlow(config_entries.OptionsFlow):
         """Initialize options flow."""
         self._selected_location: str | None = None
 
+    def _runtime_available(self) -> bool:
+        """Return whether the integration runtime is loaded."""
+        domain_data = self.hass.data.get(DOMAIN, {})
+        return "coordinator" in domain_data and "api" in domain_data and "storage" in domain_data
+
     def _snapshot_locations(self) -> dict[str, dict[str, Any]]:
         """Return current known locations."""
         coordinator = get_coordinator(self.hass)
@@ -190,14 +195,53 @@ class InventoryOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Handle options flow."""
+        if not self._runtime_available():
+            return await self.async_step_connection()
+
         locations = self._snapshot_locations()
         if not locations:
             return await self.async_step_add_location()
 
         return self.async_show_menu(
             step_id="init",
-            menu_options=["add_location", "select_location"],
+            menu_options=["connection", "add_location", "select_location"],
             description_placeholders={"location_count": str(len(locations))},
+        )
+
+    async def async_step_connection(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Update pantry-server connection settings from the options flow."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            normalized_input = _normalize_user_input(user_input)
+            try:
+                await _validate_server(self.hass, normalized_input)
+            except PantryAuthError:
+                errors["base"] = "auth"
+            except PantryTimeoutError:
+                errors["base"] = "timeout"
+            except PantryValidationError:
+                errors["base"] = "invalid_response"
+            except PantryUnavailableError:
+                errors["base"] = "cannot_connect"
+            else:
+                self.hass.config_entries.async_update_entry(
+                    self.config_entry,
+                    data=normalized_input,
+                )
+                await self.hass.config_entries.async_reload(self.config_entry.entry_id)
+                return self.async_create_entry(title="", data={})
+
+        defaults = dict(self.config_entry.data)
+        if CONF_API_KEY in defaults and defaults[CONF_API_KEY]:
+            defaults[CONF_API_KEY] = ""
+
+        return self.async_show_form(
+            step_id="connection",
+            data_schema=_config_schema(defaults),
+            errors=errors,
         )
 
     async def async_step_add_location(self, user_input: dict[str, Any] | None = None) -> FlowResult:
