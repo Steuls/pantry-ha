@@ -20,15 +20,14 @@ from .const import (
     DATA_API,
     DATA_COORDINATOR,
     DATA_ENTRY_ID,
-    DATA_INTENTS_REGISTERED,
     DATA_SERVICES_REGISTERED,
     DATA_STORAGE,
-    DOMAIN,
 )
 from .coordinator import InventoryCoordinator
 from .exceptions import PantryApiError
 from .intent import async_setup_intents
 from .panel import async_setup_panel
+from .runtime import get_domain_data, get_storage
 from .services import async_install_assist_sentences, async_setup_services
 from .storage import InventoryStorage
 
@@ -38,39 +37,9 @@ if TYPE_CHECKING:
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 
-def _get_domain_data(hass: HomeAssistant) -> dict[str, Any]:
-    """Return shared domain data."""
-    if DOMAIN not in hass.data:
-        hass.data[DOMAIN] = {
-            DATA_INTENTS_REGISTERED: False,
-            DATA_SERVICES_REGISTERED: False,
-        }
-    return hass.data[DOMAIN]
-
-
-def get_storage(hass: HomeAssistant) -> InventoryStorage:
-    """Return integration storage."""
-    return _get_domain_data(hass)[DATA_STORAGE]
-
-
-def get_coordinator(hass: HomeAssistant) -> InventoryCoordinator:
-    """Return integration coordinator."""
-    return _get_domain_data(hass)[DATA_COORDINATOR]
-
-
-def get_api(hass: HomeAssistant) -> PantryApiClient:
-    """Return integration API client."""
-    return _get_domain_data(hass)[DATA_API]
-
-
-def get_active_entry_id(hass: HomeAssistant) -> str | None:
-    """Return the active config entry id."""
-    return _get_domain_data(hass).get(DATA_ENTRY_ID)
-
-
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Set up the Inventory integration."""
-    domain_data = _get_domain_data(hass)
+    domain_data = get_domain_data(hass)
 
     if DATA_STORAGE not in domain_data:
         storage = InventoryStorage(hass)
@@ -93,7 +62,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Inventory from a config entry."""
-    domain_data = _get_domain_data(hass)
+    domain_data = get_domain_data(hass)
     storage = get_storage(hass)
     session = async_get_clientsession(hass)
     api = PantryApiClient(
@@ -132,7 +101,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not unload_ok:
         return False
 
-    domain_data = _get_domain_data(hass)
+    domain_data = get_domain_data(hass)
     domain_data.pop(DATA_API, None)
     domain_data.pop(DATA_COORDINATOR, None)
     domain_data.pop(DATA_ENTRY_ID, None)

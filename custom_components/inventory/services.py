@@ -11,7 +11,6 @@ import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 
-from . import get_api, get_coordinator, get_storage
 from .const import DOMAIN
 from .exceptions import (
     PantryAuthError,
@@ -21,6 +20,7 @@ from .exceptions import (
     PantryUnavailableError,
     PantryValidationError,
 )
+from .runtime import get_api, get_coordinator, get_storage
 from .storage import InventoryStorage
 
 ASSIST_SENTENCES_EN = dedent(

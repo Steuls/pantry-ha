@@ -8,8 +8,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import intent
 
-from . import get_coordinator
 from .const import DATA_INTENTS_REGISTERED, DOMAIN
+from .runtime import get_coordinator
 from .storage import InventoryStorage
 
 INTENT_ADD_ITEM = "InventoryAddItem"

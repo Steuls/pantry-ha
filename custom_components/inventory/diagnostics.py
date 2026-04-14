@@ -8,8 +8,8 @@ from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
-from . import get_coordinator, get_storage
 from .const import CONF_API_KEY, CONF_BASE_URL
+from .runtime import get_coordinator, get_storage
 
 TO_REDACT = {CONF_API_KEY}
 

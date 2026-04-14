@@ -11,9 +11,9 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import get_coordinator
 from .const import DOMAIN
 from .coordinator import InventoryCoordinator
+from .runtime import get_coordinator
 from .storage import InventoryStorage
 
 

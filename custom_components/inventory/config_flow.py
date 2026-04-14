@@ -21,7 +21,6 @@ from homeassistant.helpers.selector import (
 )
 from homeassistant.util import slugify
 
-from . import get_api, get_coordinator, get_storage
 from .api import PantryApiClient
 from .const import (
     CONF_API_KEY,
@@ -44,6 +43,7 @@ from .exceptions import (
     PantryUnavailableError,
     PantryValidationError,
 )
+from .runtime import get_api, get_coordinator, get_storage
 from .storage import InventoryStorage
 
 
