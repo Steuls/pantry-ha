@@ -1,13 +1,14 @@
 # Inventory - Home Assistant Custom Integration
 
-A custom Home Assistant integration for tracking food inventory across configurable storage locations (freezer, cupboard, fridge, etc.).
+A custom Home Assistant integration for tracking food inventory across configurable storage locations (freezer, cupboard, fridge, etc.) while using `pantry-server` as the source of truth.
 
 ## Features
 
+- **Server-Backed State** - `pantry-server` owns locations and items
 - **Configurable Locations** - Add/remove storage locations via UI
 - **Item Tracking** - Track name, quantity, unit, expiry date, category, and notes
 - **Expiry Monitoring** - Automatic expired/expiring-soon counts per location
-- **Persistence** - Data survives Home Assistant restarts
+- **Cached Read State** - Last known snapshot survives Home Assistant restarts and temporary backend outages
 - **Automation Ready** - Events fired on all inventory changes
 - **Native Sidebar UI** - Manage inventory directly in Home Assistant
 - **Dashboard Compatible** - Works with existing HA cards
@@ -30,14 +31,19 @@ A custom Home Assistant integration for tracking food inventory across configura
 1. Go to **Settings** → **Devices & Services**
 2. Click **Add Integration** (bottom right)
 3. Search for "Inventory" and select it
-4. The integration will be set up automatically
+4. Enter:
+   - your `pantry-server` base URL
+   - a bearer token with `locations:read`, `locations:write`, `items:read`, and `items:write`
+   - polling and timeout settings
+5. Submit the form to validate `GET /api/v1/health` and `GET /api/v1/state`
 
 ## Managing Locations
 
 After setup, click the **Configure** (gear) button on the integration card:
 
-- **Add Location** - Create a new storage location (e.g., "Freezer", "Cupboard")
+- **Add Location** - Create a new pantry-server location (e.g., "Freezer", "Cupboard")
 - **Manage Location** - Rename or delete existing locations
+- **Icon overrides** - The location name lives in `pantry-server`; the optional HA icon remains local
 
 ## Home Assistant UI
 
@@ -55,7 +61,7 @@ Location creation/rename/delete still lives under **Settings → Devices & Servi
 
 ### inventory.add_item
 
-Add an item to a location. If an item with the same name exists, it will update the quantity.
+Add an item to a location. If an item with the same name exists, it will update the quantity on the server.
 
 ```yaml
 service: inventory.add_item
@@ -152,6 +158,15 @@ Notes:
 - `add` and `remove` voice commands currently use the default quantity of `1`.
 - `what's in ...` reads back up to 5 item names for the matched location.
 - `what's expiring soon` works globally or for a specific location.
+
+## Migration
+
+If you previously used the local-only version of this integration, old `.storage` data is preserved for migration.
+
+- Call `inventory.export_local_data` to retrieve the preserved legacy payload from Home Assistant.
+- Import that payload into `pantry-server` with the server-side import tooling under `../pantry-server/scripts/`.
+- Reconfigure Home Assistant to point at the server URL and token.
+- Verify sensors, services, panel behavior, automations, and Assist after the first successful sync.
 
 ## Entities
 

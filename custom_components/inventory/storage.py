@@ -1,385 +1,260 @@
-"""Storage helper for Inventory integration."""
+"""Cache and compatibility helpers for Inventory integration."""
 
 from __future__ import annotations
 
-import logging
-from datetime import date, datetime
+from copy import deepcopy
+from datetime import date, timedelta
 from typing import Any
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.storage import Store
 
-from .const import DOMAIN
+from .const import DEFAULT_ICON, DOMAIN
 
-_LOGGER = logging.getLogger(__name__)
-
-STORAGE_VERSION = 1
+STORAGE_VERSION = 2
 STORAGE_KEY = f"{DOMAIN}_data"
 
 
 class InventoryStorage:
-    """Manage inventory data persistence."""
+    """Manage cached state and legacy compatibility data."""
 
     def __init__(self, hass: HomeAssistant) -> None:
         """Initialize storage."""
-        _LOGGER.debug("InventoryStorage.__init__ called")
-        self._hass = hass
         self._store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
-        self._data: dict[str, Any] | None = None
+        self._data: dict[str, Any] = {
+            "cache": None,
+            "location_meta": {},
+            "legacy_export": None,
+            "last_successful_sync": None,
+        }
 
     async def async_load(self) -> None:
-        """Load data from storage."""
-        _LOGGER.debug("InventoryStorage.async_load called")
-        self._data = await self._store.async_load()
-        if self._data is None:
-            _LOGGER.debug("No existing data, creating empty structure")
-            self._data = {"locations": {}}
-        _LOGGER.debug("Data loaded: %s locations", len(self._data.get("locations", {})))
+        """Load persisted data."""
+        stored = await self._store.async_load()
+        if stored is None:
+            return
+
+        if "locations" in stored:
+            self._data["legacy_export"] = {"locations": stored.get("locations", {})}
+            self._data["location_meta"] = {
+                location_id: {"icon": location.get("icon", DEFAULT_ICON)}
+                for location_id, location in stored.get("locations", {}).items()
+            }
+            return
+
+        self._data.update(stored)
 
     async def async_save(self) -> None:
-        """Save data to storage."""
-        if self._data is not None:
-            await self._store.async_save(self._data)
-
-    # === Location CRUD ===
+        """Save storage state."""
+        await self._store.async_save(self._data)
 
     @callback
-    def get_locations(self) -> dict[str, dict[str, Any]]:
-        """Get all locations."""
-        if self._data is None:
-            return {}
-        return self._data.get("locations", {})
+    def get_location_icon(self, location_id: str) -> str:
+        """Return a configured icon for one location."""
+        return (
+            self._data.get("location_meta", {})
+            .get(location_id, {})
+            .get("icon", DEFAULT_ICON)
+        )
 
-    @callback
-    def get_location(self, location_id: str) -> dict[str, Any] | None:
-        """Get a specific location by ID."""
-        return self.get_locations().get(location_id)
-
-    async def async_add_location(
-        self, location_id: str, name: str, icon: str = "mdi:package-variant"
-    ) -> dict[str, Any]:
-        """Add a new storage location."""
-        if self._data is None:
-            await self.async_load()
-
-        locations = self._data.setdefault("locations", {})
-        locations[location_id] = {
-            "name": name,
-            "icon": icon,
-            "items": [],
-        }
+    async def async_set_location_icon(self, location_id: str, icon: str | None) -> None:
+        """Persist an icon override for one location."""
+        location_meta = self._data.setdefault("location_meta", {})
+        meta = location_meta.setdefault(location_id, {})
+        meta["icon"] = icon or DEFAULT_ICON
         await self.async_save()
-        return locations[location_id]
 
-    async def async_update_location(
-        self, location_id: str, name: str | None = None, icon: str | None = None
-    ) -> dict[str, Any] | None:
-        """Update a location's metadata."""
-        location = self.get_location(location_id)
-        if location is None:
+    async def async_remove_location_icon(self, location_id: str) -> None:
+        """Remove icon metadata for a deleted location."""
+        location_meta = self._data.setdefault("location_meta", {})
+        if location_id in location_meta:
+            del location_meta[location_id]
+            await self.async_save()
+
+    @callback
+    def get_cached_snapshot(self) -> dict[str, Any] | None:
+        """Return the last cached normalized snapshot."""
+        cache = self._data.get("cache")
+        if cache is None:
             return None
+        return deepcopy(cache)
 
-        if name is not None:
-            location["name"] = name
-        if icon is not None:
-            location["icon"] = icon
-
+    async def async_save_snapshot(self, snapshot: dict[str, Any], synced_at: str) -> None:
+        """Persist a normalized snapshot."""
+        self._data["cache"] = deepcopy(snapshot)
+        self._data["last_successful_sync"] = synced_at
         await self.async_save()
-        return location
-
-    async def async_remove_location(self, location_id: str) -> bool:
-        """Remove a location and all its items."""
-        if self._data is None or location_id not in self._data.get("locations", {}):
-            return False
-
-        del self._data["locations"][location_id]
-        await self.async_save()
-        return True
-
-    # === Item CRUD ===
 
     @callback
-    def get_items(self, location_id: str) -> list[dict[str, Any]]:
-        """Get all items in a location."""
-        location = self.get_location(location_id)
+    def get_last_successful_sync(self) -> str | None:
+        """Return the last successful sync timestamp."""
+        return self._data.get("last_successful_sync")
+
+    @callback
+    def get_legacy_export_payload(self) -> dict[str, Any] | None:
+        """Return legacy local data for migration export."""
+        payload = self._data.get("legacy_export")
+        if payload is None:
+            return None
+        return deepcopy(payload)
+
+    @staticmethod
+    @callback
+    def normalize_state(
+        raw_state: dict[str, Any],
+        *,
+        storage: InventoryStorage,
+        source: str,
+        etag: str | None,
+    ) -> dict[str, Any]:
+        """Normalize pantry-server state into HA-friendly location groups."""
+        raw_locations = raw_state.get("locations", [])
+        raw_items = raw_state.get("items", [])
+
+        items_by_location: dict[str, list[dict[str, Any]]] = {}
+        for raw_item in raw_items:
+            item = InventoryStorage._normalize_item(raw_item)
+            items_by_location.setdefault(item["location_id"], []).append(item)
+
+        locations: dict[str, dict[str, Any]] = {}
+        for raw_location in raw_locations:
+            location_id = raw_location["id"]
+            items = items_by_location.get(location_id, [])
+            locations[location_id] = InventoryStorage._normalize_location(
+                raw_location,
+                items,
+                storage.get_location_icon(location_id),
+            )
+
+        return {
+            "generated_at": raw_state.get("generatedAt"),
+            "source": source,
+            "etag": etag,
+            "summary": raw_state.get("summary", {}),
+            "locations": locations,
+        }
+
+    @staticmethod
+    def _normalize_item(raw_item: dict[str, Any]) -> dict[str, Any]:
+        """Normalize one item record from the API."""
+        expires_on = raw_item.get("expiresOn")
+        added_at = raw_item.get("createdAt")
+        location = raw_item.get("location") or {}
+        return {
+            "id": raw_item.get("id"),
+            "name": raw_item.get("name"),
+            "quantity": raw_item.get("quantity", 1),
+            "unit": raw_item.get("unit"),
+            "expiry": expires_on[:10] if isinstance(expires_on, str) else None,
+            "added": added_at[:10] if isinstance(added_at, str) else None,
+            "category": raw_item.get("category"),
+            "notes": raw_item.get("notes"),
+            "location_id": raw_item.get("locationId") or location.get("id"),
+            "location_name": location.get("name"),
+        }
+
+    @staticmethod
+    def _normalize_location(
+        raw_location: dict[str, Any],
+        items: list[dict[str, Any]],
+        icon: str,
+    ) -> dict[str, Any]:
+        """Normalize one location."""
+        expired_items = [item for item in items if InventoryStorage._is_expired(item)]
+        expiring_soon_items = [
+            item for item in items if InventoryStorage._is_expiring_soon(item)
+        ]
+        categories = sorted({item["category"] for item in items if item.get("category")})
+
+        return {
+            "id": raw_location["id"],
+            "name": raw_location.get("name", raw_location["id"]),
+            "icon": icon,
+            "description": raw_location.get("description"),
+            "sort_order": raw_location.get("sortOrder", 0),
+            "items": items,
+            "item_count": len(items),
+            "expired_count": len(expired_items),
+            "expiring_soon_count": len(expiring_soon_items),
+            "categories": categories,
+        }
+
+    @staticmethod
+    @callback
+    def get_locations(snapshot: dict[str, Any] | None) -> dict[str, dict[str, Any]]:
+        """Return locations from a normalized snapshot."""
+        if snapshot is None:
+            return {}
+        return snapshot.get("locations", {})
+
+    @staticmethod
+    @callback
+    def get_location(snapshot: dict[str, Any] | None, location_id: str) -> dict[str, Any] | None:
+        """Return one location from a normalized snapshot."""
+        return InventoryStorage.get_locations(snapshot).get(location_id)
+
+    @staticmethod
+    @callback
+    def get_items(snapshot: dict[str, Any] | None, location_id: str) -> list[dict[str, Any]]:
+        """Return items for one location."""
+        location = InventoryStorage.get_location(snapshot, location_id)
         if location is None:
             return []
-        return location.get("items", [])
+        return list(location.get("items", []))
 
+    @staticmethod
     @callback
     def get_item(
-        self, location_id: str, item_name: str
+        snapshot: dict[str, Any] | None,
+        location_id: str,
+        item_name: str,
     ) -> dict[str, Any] | None:
-        """Get a specific item by name (case-insensitive)."""
-        items = self.get_items(location_id)
-        item_name_lower = item_name.lower()
-        for item in items:
-            if item.get("name", "").lower() == item_name_lower:
+        """Find one item by exact case-insensitive name."""
+        lookup = item_name.casefold()
+        for item in InventoryStorage.get_items(snapshot, location_id):
+            if str(item.get("name", "")).casefold() == lookup:
                 return item
         return None
 
-    async def async_add_item(
-        self,
-        location_id: str,
-        name: str,
-        quantity: int = 1,
-        unit: str | None = None,
-        expiry: str | None = None,
-        category: str | None = None,
-        notes: str | None = None,
-    ) -> dict[str, Any] | None:
-        """Add an item to a location. Updates existing if name matches."""
-        location = self.get_location(location_id)
-        if location is None:
-            return None
-
-        items = location.setdefault("items", [])
-
-        # Check for existing item (case-insensitive)
-        existing = self.get_item(location_id, name)
-        if existing is not None:
-            # Update existing item - merge/overwrite
-            existing["quantity"] = existing.get("quantity", 1) + quantity
-            if unit is not None:
-                existing["unit"] = unit
-            if expiry is not None:
-                existing["expiry"] = expiry
-            if category is not None:
-                existing["category"] = category
-            if notes is not None:
-                existing["notes"] = notes
-            item = existing
-        else:
-            # Add new item
-            today = date.today().isoformat()
-            item = {
-                "name": name,
-                "quantity": quantity,
-                "added": today,
-            }
-            if unit is not None:
-                item["unit"] = unit
-            if expiry is not None:
-                item["expiry"] = expiry
-            if category is not None:
-                item["category"] = category
-            if notes is not None:
-                item["notes"] = notes
-            items.append(item)
-
-        await self.async_save()
-        return item
-
-    async def async_remove_item(
-        self, location_id: str, name: str, quantity: int | None = None
-    ) -> dict[str, Any] | None:
-        """Remove an item from a location.
-
-        Args:
-            location_id: The location ID
-            name: Item name to remove
-            quantity: If specified, reduce quantity. If None or >= current, remove entirely.
-
-        Returns:
-            The removed/updated item, or None if not found.
-        """
-        location = self.get_location(location_id)
-        if location is None:
-            return None
-
-        items = location.get("items", [])
-        item_name_lower = name.lower()
-
-        for i, item in enumerate(items):
-            if item.get("name", "").lower() == item_name_lower:
-                if quantity is None or quantity >= item.get("quantity", 1):
-                    # Remove entirely
-                    removed = items.pop(i)
-                    await self.async_save()
-                    return removed
-                else:
-                    # Reduce quantity
-                    item["quantity"] = item.get("quantity", 1) - quantity
-                    await self.async_save()
-                    return item
-
-        return None
-
-    async def async_update_item(
-        self,
-        location_id: str,
-        name: str,
-        quantity: int | None = None,
-        unit: str | None = None,
-        expiry: str | None = None,
-        category: str | None = None,
-        notes: str | None = None,
-    ) -> dict[str, Any] | None:
-        """Update an item's fields."""
-        location = self.get_location(location_id)
-        if location is None:
-            return None
-
-        item = self.get_item(location_id, name)
-        if item is None:
-            return None
-
-        if quantity is not None:
-            item["quantity"] = quantity
-        if unit is not None:
-            item["unit"] = unit
-        if expiry is not None:
-            item["expiry"] = expiry
-        if category is not None:
-            item["category"] = category
-        if notes is not None:
-            item["notes"] = notes
-
-        await self.async_save()
-        return item
-
-    async def async_clear_expired(
-        self, location_id: str | None = None
-    ) -> list[dict[str, Any]]:
-        """Clear expired items from one or all locations.
-
-        Args:
-            location_id: Specific location, or None to clear all locations.
-
-        Returns:
-            List of removed items with their location_id added.
-        """
-        removed_items = []
-        today = date.today()
-
-        if location_id:
-            # Clear from specific location
-            location = self.get_location(location_id)
-            if location is None:
-                return []
-            items = location.get("items", [])
-            expired = [
-                item
-                for item in items
-                if self._is_expired(item, today)
-            ]
-            location["items"] = [
-                item for item in items if not self._is_expired(item, today)
-            ]
-            for item in expired:
-                item["location_id"] = location_id
-                removed_items.append(item)
-        else:
-            # Clear from all locations
-            for loc_id, location in self.get_locations().items():
-                items = location.get("items", [])
-                expired = [
-                    item
-                    for item in items
-                    if self._is_expired(item, today)
-                ]
-                location["items"] = [
-                    item for item in items if not self._is_expired(item, today)
-                ]
-                for item in expired:
-                    item["location_id"] = loc_id
-                    removed_items.append(item)
-
-        if removed_items:
-            await self.async_save()
-
-        return removed_items
-
-    async def async_clear_all(self, location_id: str) -> list[dict[str, Any]]:
-        """Clear all items from a location.
-
-        Returns:
-            List of removed items.
-        """
-        location = self.get_location(location_id)
-        if location is None:
-            return []
-
-        items = location.get("items", [])
-        location["items"] = []
-        await self.async_save()
-        return items
-
-    # === Helper methods ===
-
     @staticmethod
-    def _is_expired(item: dict[str, Any], check_date: date) -> bool:
-        """Check if an item is expired."""
-        expiry_str = item.get("expiry")
-        if not expiry_str:
-            return False
-        try:
-            expiry_date = date.fromisoformat(expiry_str)
-            return expiry_date < check_date
-        except ValueError:
-            return False
-
-    @callback
-    def get_expired_count(self, location_id: str) -> int:
-        """Get count of expired items in a location."""
-        today = date.today()
-        return sum(
-            1 for item in self.get_items(location_id)
-            if self._is_expired(item, today)
-        )
-
-    @callback
-    def get_expiring_soon_count(self, location_id: str, days: int = 7) -> int:
-        """Get count of items expiring within N days."""
-        today = date.today()
-        threshold = date.today()
-        # Calculate date N days from now
-        from datetime import timedelta
-        threshold = today + timedelta(days=days)
-
-        count = 0
-        for item in self.get_items(location_id):
-            expiry_str = item.get("expiry")
-            if not expiry_str:
-                continue
-            try:
-                expiry_date = date.fromisoformat(expiry_str)
-                if today <= expiry_date <= threshold:
-                    count += 1
-            except ValueError:
-                pass
-        return count
-
     @callback
     def get_expiring_soon_items(
-        self, location_id: str, days: int = 7
+        snapshot: dict[str, Any] | None,
+        location_id: str,
+        days: int = 7,
     ) -> list[dict[str, Any]]:
-        """Get items expiring within N days."""
+        """Return items expiring within N days."""
         today = date.today()
-        from datetime import timedelta
-
-        threshold = today + timedelta(days=days)
+        cutoff = today + timedelta(days=days)
         matches = []
-        for item in self.get_items(location_id):
-            expiry_str = item.get("expiry")
-            if not expiry_str:
-                continue
-            try:
-                expiry_date = date.fromisoformat(expiry_str)
-            except ValueError:
-                continue
-
-            if today <= expiry_date <= threshold:
+        for item in InventoryStorage.get_items(snapshot, location_id):
+            expiry = InventoryStorage._parse_expiry(item)
+            if expiry and today <= expiry <= cutoff:
                 matches.append(item)
-
         return matches
 
-    @callback
-    def get_categories(self, location_id: str) -> list[str]:
-        """Get unique categories in a location."""
-        categories = set()
-        for item in self.get_items(location_id):
-            category = item.get("category")
-            if category:
-                categories.add(category)
-        return sorted(categories)
+    @staticmethod
+    def _parse_expiry(item: dict[str, Any]) -> date | None:
+        """Parse item expiry."""
+        expiry_str = item.get("expiry")
+        if not expiry_str:
+            return None
+        try:
+            return date.fromisoformat(expiry_str)
+        except ValueError:
+            return None
+
+    @staticmethod
+    def _is_expired(item: dict[str, Any]) -> bool:
+        """Return whether item is expired."""
+        expiry = InventoryStorage._parse_expiry(item)
+        return expiry is not None and expiry < date.today()
+
+    @staticmethod
+    def _is_expiring_soon(item: dict[str, Any], days: int = 7) -> bool:
+        """Return whether item expires soon."""
+        expiry = InventoryStorage._parse_expiry(item)
+        if expiry is None:
+            return False
+        today = date.today()
+        return today <= expiry <= today + timedelta(days=days)

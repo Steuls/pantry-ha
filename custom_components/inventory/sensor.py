@@ -11,7 +11,9 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
+from . import get_coordinator
 from .const import DOMAIN
+from .coordinator import InventoryCoordinator
 from .storage import InventoryStorage
 
 
@@ -21,95 +23,83 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Inventory sensors."""
-    storage: InventoryStorage = hass.data[DOMAIN]["storage"]
+    coordinator = get_coordinator(hass)
+    known_locations: set[str] = set()
 
-    # Create sensors for each location
-    sensors: list[InventorySensor] = []
-    for location_id, location_data in storage.get_locations().items():
-        sensors.append(InventorySensor(hass, location_id))
+    @callback
+    def _sync_entities() -> None:
+        new_entities: list[InventorySensor] = []
+        for location_id in InventoryStorage.get_locations(coordinator.data):
+            if location_id in known_locations:
+                continue
+            known_locations.add(location_id)
+            new_entities.append(InventorySensor(coordinator, location_id))
+        if new_entities:
+            async_add_entities(new_entities)
 
-    async_add_entities(sensors)
+    _sync_entities()
+    entry.async_on_unload(coordinator.async_add_listener(_sync_entities))
 
 
-class InventorySensor(SensorEntity):
-    """Representation of an Inventory location sensor."""
+class InventorySensor(CoordinatorEntity[InventoryCoordinator], SensorEntity):
+    """Representation of one inventory location sensor."""
 
     _attr_has_entity_name = True
     _attr_translation_key = "inventory"
 
-    def __init__(self, hass: HomeAssistant, location_id: str) -> None:
+    def __init__(self, coordinator: InventoryCoordinator, location_id: str) -> None:
         """Initialize the sensor."""
-        self.hass = hass
+        super().__init__(coordinator)
         self._location_id = location_id
-        self._storage: InventoryStorage = hass.data[DOMAIN]["storage"]
-
-        # Set unique ID
         self._attr_unique_id = f"{DOMAIN}_{location_id}"
-
-        # Get location data for initial name
-        location = self._storage.get_location(location_id)
-        self._attr_name = location.get("name", location_id) if location else location_id
-
-        # Device info for grouping
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, DOMAIN)},
             name="Inventory",
-            manufacturer="Custom",
+            manufacturer="Pantry",
         )
 
     @property
-    def location_id(self) -> str:
-        """Return the location ID."""
-        return self._location_id
+    def _location(self) -> dict[str, Any] | None:
+        """Return current location snapshot."""
+        return InventoryStorage.get_location(self.coordinator.data, self._location_id)
+
+    @property
+    def available(self) -> bool:
+        """Return whether the entity is available."""
+        return self._location is not None and self.coordinator.has_usable_data
+
+    @property
+    def name(self) -> str | None:
+        """Return the display name."""
+        location = self._location
+        return location["name"] if location else self._location_id
 
     @property
     def native_value(self) -> int:
         """Return the item count."""
-        items = self._storage.get_items(self._location_id)
-        return len(items)
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return entity attributes."""
-        location = self._storage.get_location(self._location_id)
-        if location is None:
-            return {}
-
-        items = self._storage.get_items(self._location_id)
-
-        return {
-            "location_id": self._location_id,
-            "location_name": location.get("name", self._location_id),
-            "icon": location.get("icon", "mdi:package-variant"),
-            "items": items,
-            "item_count": len(items),
-            "expired_count": self._storage.get_expired_count(self._location_id),
-            "expiring_soon_count": self._storage.get_expiring_soon_count(self._location_id),
-            "categories": self._storage.get_categories(self._location_id),
-        }
+        location = self._location
+        return location.get("item_count", 0) if location else 0
 
     @property
     def icon(self) -> str:
         """Return the icon."""
-        location = self._storage.get_location(self._location_id)
-        if location:
-            return location.get("icon", "mdi:package-variant")
-        return "mdi:package-variant"
+        location = self._location
+        return location.get("icon") if location else "mdi:package-variant"
 
-    async def async_added_to_hass(self) -> None:
-        """Run when entity is added to hass."""
-        # Register update callback
-        self.async_on_remove(
-            self.hass.bus.async_listen(
-                f"{DOMAIN}_updated",
-                self._on_inventory_update
-            )
-        )
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return entity attributes."""
+        location = self._location
+        if location is None:
+            return {}
 
-    @callback
-    def _on_inventory_update(self, event) -> None:
-        """Handle inventory update event."""
-        # Only update if this location is affected
-        affected_location = event.data.get("location_id")
-        if affected_location is None or affected_location == self._location_id:
-            self.async_schedule_update_ha_state(True)
+        return {
+            "location_id": self._location_id,
+            "location_name": location["name"],
+            "icon": location.get("icon", "mdi:package-variant"),
+            "items": location.get("items", []),
+            "item_count": location.get("item_count", 0),
+            "expired_count": location.get("expired_count", 0),
+            "expiring_soon_count": location.get("expiring_soon_count", 0),
+            "categories": location.get("categories", []),
+        }

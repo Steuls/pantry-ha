@@ -147,3 +147,7 @@ clear_all:
 install_assist_sentences:
   name: Install Assist Sentences
   description: Copy the packaged Assist sentence file into Home Assistant's custom_sentences directory.
+
+export_local_data:
+  name: Export Local Data
+  description: Return preserved legacy local storage data for migration into pantry-server.

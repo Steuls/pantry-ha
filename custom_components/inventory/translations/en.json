@@ -2,12 +2,25 @@
   "config": {
     "step": {
       "user": {
-        "title": "Set up Inventory",
-        "description": "Set up inventory tracking for your food storage locations."
+        "title": "Connect Inventory",
+        "description": "Connect Home Assistant to your pantry-server instance.",
+        "data": {
+          "base_url": "Server URL",
+          "api_key": "API key",
+          "poll_seconds": "Poll interval (seconds)",
+          "request_timeout": "Request timeout (seconds)",
+          "enable_cache": "Use cached state during outages"
+        }
       }
     },
     "abort": {
       "single_instance_allowed": "Only one Inventory integration is allowed."
+    },
+    "error": {
+      "auth": "Authentication failed.",
+      "cannot_connect": "Could not connect to pantry-server.",
+      "timeout": "The pantry-server request timed out.",
+      "invalid_response": "The pantry-server response was invalid."
     }
   },
   "options": {
@@ -20,18 +33,15 @@
           "select_location": "Manage existing location"
         },
         "menu_option_descriptions": {
-          "add_location": "Create a new storage location using the default icon.",
-          "select_location": "Rename a location, change its icon, or delete it."
+          "add_location": "Create a new pantry location in pantry-server.",
+          "select_location": "Rename a location, change its local icon, or delete it."
         }
       },
       "add_location": {
         "title": "Add Location",
-        "description": "Create a new storage location. You can change its icon later if you want.",
+        "description": "Create a new server-backed storage location.",
         "data": {
           "name": "Name"
-        },
-        "data_description": {
-          "name": "For example: Pantry, Fridge, Freezer, or Cupboard."
         }
       },
       "select_location": {
@@ -48,23 +58,14 @@
           "rename_location": "Rename or change icon",
           "delete_location": "Delete location",
           "init": "Back to locations"
-        },
-        "menu_option_descriptions": {
-          "rename_location": "Update the display name or icon shown in Home Assistant.",
-          "delete_location": "Remove this location and all items stored in it.",
-          "init": "Return to the location list."
         }
       },
       "rename_location": {
         "title": "Rename Location",
-        "description": "Update the name and icon for this location.",
+        "description": "Update the server-backed name and local icon for this location.",
         "data": {
           "name": "Name",
           "icon": "Icon"
-        },
-        "data_description": {
-          "name": "The name shown in Home Assistant.",
-          "icon": "Optional Material Design Icons value, for example mdi:package-variant."
         }
       },
       "delete_location": {
@@ -77,7 +78,11 @@
     },
     "error": {
       "name_required": "Name is required.",
-      "name_exists": "A location with this name already exists."
+      "name_exists": "A location with this name already exists.",
+      "cannot_connect": "Could not connect to pantry-server.",
+      "location_not_found": "The selected location no longer exists.",
+      "location_not_empty": "The location must be empty before it can be deleted.",
+      "invalid_response": "The pantry-server response was invalid."
     }
   },
   "title": "Inventory"
