@@ -11,7 +11,7 @@ from homeassistant.helpers.storage import Store
 
 from .const import DEFAULT_ICON, DOMAIN
 
-STORAGE_VERSION = 2
+STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}_data"
 
 
